@@ -14,6 +14,23 @@ const reactCSSTransitionGroupChild = React.createFactory(ReactCSSTransitionGroup
 
 const TICK = 17;
 
+function outerSize(dim, element) {
+  const style = element.currentStyle || window.getComputedStyle(element);
+  const margin = parseFloat(style.marginLeft) + parseFloat(style.marginRight);
+  const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+  const border = parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth);
+  const size = dim === 'width' ? element.offsetWidth : element.offsetHeight;
+  const fudge = dim === 'width' ? 0.5 : 2.5;
+  return (size + margin - padding + border + fudge);
+}
+
+function outerWidth(element) {
+  return outerSize('width', element);
+}
+
+function outerHeight(element) {
+  return outerSize('height', element);
+}
 
 function createTransitionTimeoutPropValidator(transitionType) {
   const timeoutPropName = 'transition' + transitionType + 'Timeout';
@@ -60,9 +77,13 @@ export default class ReactCSSTransitionReplace extends React.Component {
   };
 
   state = {
+    active: false,
     currentChild: this.props.children ? React.Children.only(this.props.children) : null,
     nextChild: null,
-    height: null
+    height: null,
+    width: null,
+    oldHeight: null,
+    oldWidth: null
   };
 
   componentDidMount() {
@@ -90,14 +111,24 @@ export default class ReactCSSTransitionReplace extends React.Component {
     }
 
     // Set the next child to start the transition, and set the current height.
+    const oldWidth = this.state.currentChild ? outerWidth(ReactDOM.findDOMNode(this.refs.curr)) : 0;
+    const oldHeight = this.state.currentChild ? outerHeight(ReactDOM.findDOMNode(this.refs.curr)) : 0;
     this.setState({
+      active: false,
       nextChild,
-      height: this.state.currentChild ? ReactDOM.findDOMNode(this.refs.curr).offsetHeight : 0
+      height: oldHeight,
+      width: oldWidth,
+      oldHeight,
+      oldWidth
     });
 
     // Enqueue setting the next height to trigger the height transition.
     this.timeout = setTimeout(() => {
-      this.setState({height: this.state.nextChild ? ReactDOM.findDOMNode(this.refs.next).offsetHeight : 0});
+      this.setState({
+        active: true,
+        height: this.state.nextChild ? outerHeight(ReactDOM.findDOMNode(this.refs.next)) : 0,
+        width: this.state.nextChild ? outerWidth(ReactDOM.findDOMNode(this.refs.next)) : 0
+      });
       this.timeout = null;
     }, TICK);
   }
@@ -130,9 +161,13 @@ export default class ReactCSSTransitionReplace extends React.Component {
   _handleDoneEntering = () => {
     this.isTransitioning = false;
     this.setState({
+      active: false,
       currentChild: this.state.nextChild,
       nextChild: null,
-      height: null
+      height: null,
+      width: null,
+      oldHeight: null,
+      oldWidth: null
     });
   }
 
@@ -149,7 +184,11 @@ export default class ReactCSSTransitionReplace extends React.Component {
 
       if (!this.state.nextChild) {
         this.isTransitioning = false;
+        state.active = false;
         state.height = null;
+        state.width = null;
+        state.oldHeight = null;
+        state.oldWidth = null;
       }
 
       this.setState(state);
@@ -172,24 +211,48 @@ export default class ReactCSSTransitionReplace extends React.Component {
   }
 
   render() {
-    const { currentChild, nextChild, height } = this.state;
+    const {
+      active,
+      currentChild,
+      nextChild,
+      height,
+      width,
+      oldWidth,
+      oldHeight
+    } = this.state;
     const childrenToRender = [];
 
     const { overflowHidden, ...containerProps } = this.props;
 
     if (currentChild) {
-      childrenToRender.push(this._wrapChild(currentChild, {
-        ref: 'curr', key: 'curr'
-      }));
+      childrenToRender.push(
+        React.createElement('span',
+          {
+            style: {
+              display: 'block',
+              height: oldHeight,
+              width: oldWidth
+            },
+            key: 'curr'
+          },
+          this._wrapChild(currentChild, {ref: 'curr'})
+        )
+      );
     }
 
-    if (height !== null) {
+    if (height !== null && width !== null) {
       containerProps.className = `${containerProps.className || ''} ${containerProps.transitionName}-height`;
+      containerProps.className += active ? ` ${containerProps.transitionName}-height-active` : '';
       containerProps.style = objectAssign({}, containerProps.style, {
-        position: 'relative',
         display: 'block',
-        height
+        height,
+        width
       });
+      if (active) {
+        containerProps.style = objectAssign({}, containerProps.style, {
+          position: 'relative'
+        });
+      }
 
       if (overflowHidden) {
         containerProps.style.overflow = 'hidden';
@@ -204,8 +267,9 @@ export default class ReactCSSTransitionReplace extends React.Component {
               position: 'absolute',
               top: 0,
               left: 0,
-              right: 0,
-              bottom: 0
+              width: active ? width : 'auto',
+              height: active ? height : 'auto',
+              visible: active ? 'visbile' : 'hidden'
             },
             key: 'next'
           },
