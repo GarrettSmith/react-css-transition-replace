@@ -15,22 +15,13 @@ const reactCSSTransitionGroupChild = React.createFactory(ReactCSSTransitionGroup
 const TICK = 17;
 
 function outerWidth(element) {
-  const style = element.currentStyle || window.getComputedStyle(element);
-  const margin = parseFloat(style.marginLeft) + parseFloat(style.marginRight);
-  const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
-  const border = parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth);
-  const size = element.offsetWidth;
-  const fudge = 0.5;
-  return (size + margin - padding + border + fudge);
+  const bounds = element.getBoundingClientRect();
+  return (bounds.right - bounds.left);
 }
 
 function outerHeight(element) {
-  const style = element.currentStyle || window.getComputedStyle(element);
-  const margin = parseFloat(style.marginTop) + parseFloat(style.marginBottom);
-  const padding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
-  const border = parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
-  const size = element.offsetHeight;
-  return (size + margin - padding + border);
+  const bounds = element.getBoundingClientRect();
+  return (bounds.bottom - bounds.top);
 }
 
 function createTransitionTimeoutPropValidator(transitionType) {
