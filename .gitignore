@@ -3,7 +3,7 @@
 npm-debug.log
 
 # Exclude compiled files
-/lib
+#/lib
 
 /demo/assets/app.js
 /gh-pages
